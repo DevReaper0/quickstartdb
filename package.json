@@ -1,6 +1,6 @@
 {
   "name": "quickstartdb",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Database for quickly putting together projects",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
