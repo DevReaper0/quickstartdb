@@ -31,7 +31,7 @@ class DBClientSync {
   }
 
   save(): void {
-    fs.writeFileSync(this.filename, JSON.stringify(this.data));
+    fs.writeFileSync(this.filename, JSON.stringify(this.data), { flag: 'w+' });
   }
 
   get(key: string): any {
@@ -125,7 +125,7 @@ class DBClient {
   }
 
   async save(): Promise<void> {
-    await fs.promises.writeFile(this.filename, JSON.stringify(this.data));
+    await fs.promises.writeFile(this.filename, JSON.stringify(this.data), { flag: 'w+' });
   }
 
   async get(key: string): Promise<any> {
@@ -188,4 +188,278 @@ class DBClient {
   }
 }
 
-module.exports = { DBClientSync, DBClient };
+class ExpressAuthSync {
+  protected app: any;
+  protected db: DBClientSync;
+
+  protected loginRoute: string;
+  protected loginApiRoute: string;
+  protected logoutRoute: string;
+  protected registerRoute: string;
+  protected registerApiRoute: string;
+
+  constructor(app: any, db?: DBClientSync, loginRoute: string = "/login", loginApiRoute: string = "/login", logoutRoute: string = "/logout", registerRoute: string = "/register", registerApiRoute: string = "/register") {
+    this.app = app;
+    this.db = db || new DBClientSync('authdb.json');
+
+    this.loginRoute = loginRoute;
+    this.loginApiRoute = loginApiRoute;
+    this.logoutRoute = logoutRoute;
+    this.registerRoute = registerRoute;
+    this.registerApiRoute = registerApiRoute;
+  }
+
+  init(): ExpressAuthSync {
+    this.db.init();
+    return this;
+  }
+
+  createRoutes(): ExpressAuthSync {
+    this.app.get(this.loginRoute, (req: any, res: any) => {
+      this.requireUnauth(req, res);
+
+      res.setHeader("Content-Type", "text/html");
+      res.send(`
+<form action="${this.loginApiRoute}" method="POST">
+  <input type="text" name="username" placeholder="Username" />
+  <input type="password" name="password" placeholder="Password" />
+  <input type="submit" value="Login" />
+</form>
+      `);
+    });
+
+    this.app.post(this.loginApiRoute, (req: any, res: any) => {
+      this.requireUnauth(req, res);
+
+      if (req.body.username && req.body.password) {
+        let user = this.db.get(req.body.username);
+        if (user && user.password === req.body.password) {
+          req.session.user = req.body.username;
+          res.redirect("/");
+          return;
+        }
+      }
+      res.redirect(this.loginRoute);
+    });
+
+    this.app.all(this.logoutRoute, (req: any, res: any) => {
+      this.requireAuth(req, res);
+
+      req.session.user = null;
+      res.redirect(this.loginRoute);
+    });
+
+    this.app.get(this.registerRoute, (req: any, res: any) => {
+      this.requireUnauth(req, res);
+
+      res.setHeader("Content-Type", "text/html");
+      res.send(`
+<form action="${this.registerApiRoute}" method="POST">
+  <input type="text" name="username" placeholder="Username" />
+  <input type="password" name="password" placeholder="Password" />
+  <input type="submit" value="Register" />
+</form>
+      `);
+    });
+
+    this.app.post(this.registerApiRoute, (req: any, res: any) => {
+      this.requireUnauth(req, res);
+
+      if (req.body.username && req.body.password) {
+        let user = this.db.get(req.body.username);
+        if (!user) {
+          this.db.set(req.body.username, {
+            id: Math.random().toString(36).substr(2, 9),
+            username: req.body.username,
+            password: req.body.password,
+          });
+          req.session.user = req.body.username;
+          res.redirect("/");
+          return;
+        }
+        res.redirect(this.loginRoute);
+        return;
+      }
+      res.redirect(this.registerRoute);
+    });
+
+    return this;
+  }
+
+  getUserInfo(req: any): any {
+    if (!req.session.user) {
+      return null;
+    }
+
+    let user = this.db.get(req.session.user);
+    if (!user) {
+      return null;
+    }
+
+    return {
+      id: user.id,
+      username: user.username,
+    };
+  }
+
+  isAuthenticated(req: any): boolean {
+    return this.getUserInfo(req) !== null;
+  }
+
+  requireAuth(req: any, res: any, redirectUrl?: string): void {
+    if (!this.isAuthenticated(req)) {
+      res.redirect(redirectUrl || this.loginRoute);
+    }
+  }
+
+  requireUnauth(req: any, res: any, redirectUrl?: string): void {
+    if (this.isAuthenticated(req)) {
+      res.redirect(redirectUrl || "/");
+    }
+  }
+}
+
+class ExpressAuth {
+  protected app: any;
+  protected db: DBClient;
+
+  protected loginRoute: string;
+  protected loginApiRoute: string;
+  protected logoutRoute: string;
+  protected registerRoute: string;
+  protected registerApiRoute: string;
+
+  constructor(app: any, db?: DBClient, loginRoute: string = "/login", loginApiRoute: string = "/login", logoutRoute: string = "/logout", registerRoute: string = "/register", registerApiRoute: string = "/register") {
+    this.app = app;
+    this.db = db || new DBClient('authdb.json');
+
+    this.loginRoute = loginRoute;
+    this.loginApiRoute = loginApiRoute;
+    this.logoutRoute = logoutRoute;
+    this.registerRoute = registerRoute;
+    this.registerApiRoute = registerApiRoute;
+  }
+
+  async init(): Promise<ExpressAuth> {
+    await this.db.init();
+    return this;
+  }
+
+  createRoutes(): ExpressAuth {
+    this.app.get(this.loginRoute, async (req: any, res: any) => {
+      await this.requireUnauth(req, res);
+
+      res.setHeader("Content-Type", "text/html");
+      res.send(`
+<form action="${this.loginApiRoute}" method="POST">
+  <input type="text" name="username" placeholder="Username" />
+  <input type="password" name="password" placeholder="Password" />
+  <input type="submit" value="Login" />
+</form>
+      `);
+    });
+
+    this.app.post(this.loginApiRoute, async (req: any, res: any) => {
+      await this.requireUnauth(req, res);
+
+      if (req.body.username && req.body.password) {
+        let user = await this.db.get(req.body.username);
+        if (user && user.password === req.body.password) {
+          req.session.user = req.body.username;
+          res.redirect("/");
+          return;
+        }
+      }
+      res.redirect(this.loginRoute);
+    });
+
+    this.app.all(this.logoutRoute, async (req: any, res: any) => {
+      await this.requireAuth(req, res);
+
+      req.session.user = null;
+      res.redirect(this.loginRoute);
+    });
+
+    this.app.get(this.registerRoute, async (req: any, res: any) => {
+      await this.requireUnauth(req, res);
+
+      res.setHeader("Content-Type", "text/html");
+      res.send(`
+<form action="${this.registerApiRoute}" method="POST">
+  <input type="text" name="username" placeholder="Username" />
+  <input type="password" name="password" placeholder="Password" />
+  <input type="submit" value="Register" />
+</form>
+      `);
+    });
+
+    this.app.post(this.registerApiRoute, async (req: any, res: any) => {
+      await this.requireUnauth(req, res);
+
+      if (req.body.username && req.body.password) {
+        let user = await this.db.get(req.body.username);
+        if (!user) {
+          this.db.set(req.body.username, {
+            id: Math.random().toString(36).substr(2, 9),
+            username: req.body.username,
+            password: req.body.password,
+          });
+          req.session.user = req.body.username;
+          res.redirect("/");
+          return;
+        }
+        res.redirect(this.loginRoute);
+        return;
+      }
+      res.redirect(this.registerRoute);
+    });
+
+    return this;
+  }
+
+  async getUserInfo(req: any): Promise<any> {
+    if (!req.session.user) {
+      return null;
+    }
+
+    let user = await this.db.get(req.session.user);
+    if (!user) {
+      return null;
+    }
+
+    return {
+      id: user.id,
+      username: user.username,
+    };
+  }
+
+  async isAuthenticated(req: any): Promise<boolean> {
+    return await this.getUserInfo(req) !== null;
+  }
+
+  async redirectUnauth(req: any, res: any, redirectUrl?: string): Promise<void> {
+    if (!await this.isAuthenticated(req)) {
+      res.redirect(redirectUrl || this.loginRoute);
+    }
+  }
+
+  async redirectAuth(req: any, res: any, redirectUrl?: string): Promise<void> {
+    if (await this.isAuthenticated(req)) {
+      res.redirect(redirectUrl || "/");
+    }
+  }
+
+  async requireAuth(req: any, res: any, redirectUrl?: string): Promise<void> {
+    if (!await this.isAuthenticated(req)) {
+      res.redirect(redirectUrl || this.loginRoute);
+    }
+  }
+
+  async requireUnauth(req: any, res: any, redirectUrl?: string): Promise<void> {
+    if (await this.isAuthenticated(req)) {
+      res.redirect(redirectUrl || "/");
+    }
+  }
+}
+
+module.exports = { DBClientSync, DBClient, ExpressAuthSync, ExpressAuth };

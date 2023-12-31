@@ -28,5 +28,8 @@
   },
   "dependencies": {
     "tsup": "^8.0.1"
+  },
+  "optionalDependencies": {
+    "express": "^4.18.2"
   }
 }
