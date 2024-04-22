@@ -243,7 +243,7 @@ class ExpressAuthSync {
     });
 
     this.app.all(this.logoutRoute, (req: any, res: any) => {
-      this.requireAuth(req, res);
+      if (this.requireAuth(req, res)) return;
 
       req.session.user = null;
       res.redirect(this.loginRoute);
@@ -306,10 +306,12 @@ class ExpressAuthSync {
     return this.getUserInfo(req) !== null;
   }
 
-  requireAuth(req: any, res: any, redirectUrl?: string): void {
+  requireAuth(req: any, res: any, redirectUrl?: string): boolean {
     if (!this.isAuthenticated(req)) {
       res.redirect(redirectUrl || this.loginRoute);
+      return true;
     }
+    return false;
   }
 
   requireUnauth(req: any, res: any, redirectUrl?: string): boolean {
@@ -376,7 +378,7 @@ class ExpressAuth {
     });
 
     this.app.all(this.logoutRoute, async (req: any, res: any) => {
-      await this.requireAuth(req, res);
+      if (await this.requireAuth(req, res)) return;
 
       req.session.user = null;
       res.redirect(this.loginRoute);
@@ -451,10 +453,12 @@ class ExpressAuth {
     }
   }
 
-  async requireAuth(req: any, res: any, redirectUrl?: string): Promise<void> {
+  async requireAuth(req: any, res: any, redirectUrl?: string): Promise<boolean> {
     if (!await this.isAuthenticated(req)) {
       res.redirect(redirectUrl || this.loginRoute);
+      return true;
     }
+    return false;
   }
 
   async requireUnauth(req: any, res: any, redirectUrl?: string): Promise<boolean> {
