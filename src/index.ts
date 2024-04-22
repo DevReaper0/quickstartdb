@@ -216,7 +216,7 @@ class ExpressAuthSync {
 
   createRoutes(): ExpressAuthSync {
     this.app.get(this.loginRoute, (req: any, res: any) => {
-      this.requireUnauth(req, res);
+      if (this.requireUnauth(req, res)) return;
 
       res.setHeader("Content-Type", "text/html");
       res.send(`
@@ -229,7 +229,7 @@ class ExpressAuthSync {
     });
 
     this.app.post(this.loginApiRoute, (req: any, res: any) => {
-      this.requireUnauth(req, res);
+      if (this.requireUnauth(req, res)) return;
 
       if (req.body.username && req.body.password) {
         let user = this.db.get(req.body.username);
@@ -250,7 +250,7 @@ class ExpressAuthSync {
     });
 
     this.app.get(this.registerRoute, (req: any, res: any) => {
-      this.requireUnauth(req, res);
+      if (this.requireUnauth(req, res)) return;
 
       res.setHeader("Content-Type", "text/html");
       res.send(`
@@ -263,7 +263,7 @@ class ExpressAuthSync {
     });
 
     this.app.post(this.registerApiRoute, (req: any, res: any) => {
-      this.requireUnauth(req, res);
+      if (this.requireUnauth(req, res)) return;
 
       if (req.body.username && req.body.password) {
         let user = this.db.get(req.body.username);
@@ -312,10 +312,12 @@ class ExpressAuthSync {
     }
   }
 
-  requireUnauth(req: any, res: any, redirectUrl?: string): void {
+  requireUnauth(req: any, res: any, redirectUrl?: string): boolean {
     if (this.isAuthenticated(req)) {
       res.redirect(redirectUrl || "/");
+      return true;
     }
+    return false;
   }
 }
 
@@ -347,7 +349,7 @@ class ExpressAuth {
 
   createRoutes(): ExpressAuth {
     this.app.get(this.loginRoute, async (req: any, res: any) => {
-      await this.requireUnauth(req, res);
+      if (await this.requireUnauth(req, res)) return;
 
       res.setHeader("Content-Type", "text/html");
       res.send(`
@@ -360,7 +362,7 @@ class ExpressAuth {
     });
 
     this.app.post(this.loginApiRoute, async (req: any, res: any) => {
-      await this.requireUnauth(req, res);
+      if (await this.requireUnauth(req, res)) return;
 
       if (req.body.username && req.body.password) {
         let user = await this.db.get(req.body.username);
@@ -381,7 +383,7 @@ class ExpressAuth {
     });
 
     this.app.get(this.registerRoute, async (req: any, res: any) => {
-      await this.requireUnauth(req, res);
+      if (await this.requireUnauth(req, res)) return;
 
       res.setHeader("Content-Type", "text/html");
       res.send(`
@@ -394,7 +396,7 @@ class ExpressAuth {
     });
 
     this.app.post(this.registerApiRoute, async (req: any, res: any) => {
-      await this.requireUnauth(req, res);
+      if (await this.requireUnauth(req, res)) return;
 
       if (req.body.username && req.body.password) {
         let user = await this.db.get(req.body.username);
@@ -455,10 +457,12 @@ class ExpressAuth {
     }
   }
 
-  async requireUnauth(req: any, res: any, redirectUrl?: string): Promise<void> {
+  async requireUnauth(req: any, res: any, redirectUrl?: string): Promise<boolean> {
     if (await this.isAuthenticated(req)) {
       res.redirect(redirectUrl || "/");
+      return true;
     }
+    return false;
   }
 }
 
